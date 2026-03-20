@@ -1,23 +1,30 @@
 from fastapi import FastAPI, UploadFile, File
 from fastapi.responses import FileResponse
 from fastapi.middleware.cors import CORSMiddleware
-import tensorflow as tf
 import numpy as np
 from PIL import Image
 import io
+import os
+
+# Smart Import for Render vs Laptop
+try:
+    import tflite_runtime.interpreter as tflite
+except ImportError:
+    import tensorflow.lite as tflite
 
 app = FastAPI()
+app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"])
 
-# This allows your index.html to talk to this Python script
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
+# Load the LITE model (model.tflite)
+MODEL_PATH = "model.tflite"
 
-# Load the brain you just trained
-model = tf.keras.models.load_model('weather_classifier.h5')
+interpreter = None
+if os.path.exists(MODEL_PATH):
+    interpreter = tflite.Interpreter(model_path=MODEL_PATH)
+    interpreter.allocate_tensors()
+    input_details = interpreter.get_input_details()
+    output_details = interpreter.get_output_details()
+
 CLASS_NAMES = ['Cloudy', 'Rainy', 'Sunny']
 
 @app.get("/")
@@ -27,26 +34,20 @@ async def home():
 @app.post("/predict")
 async def predict(file: UploadFile = File(...)):
     try:
-        data = await file.read()
-        image = Image.open(io.BytesIO(data)).convert('RGB')
-        image = image.resize((150, 150))
-        
-        # This division by 255.0 is the "Secret Sauce" - it MUST match the training
-        img_array = np.array(image) / 255.0
+        contents = await file.read()
+        img = Image.open(io.BytesIO(contents)).convert('RGB').resize((150, 150))
+        img_array = np.array(img, dtype=np.float32) / 255.0
         img_array = np.expand_dims(img_array, axis=0)
+
+        interpreter.set_tensor(input_details[0]['index'], img_array)
+        interpreter.invoke()
+        output_data = interpreter.get_tensor(output_details[0]['index'])
         
-        predictions = model.predict(img_array)
-        score = np.max(predictions)
-        label = CLASS_NAMES[np.argmax(predictions)]
-        
+        index = np.argmax(output_data[0])
         return {
             "status": "success",
-            "prediction": label,
-            "confidence": round(float(score) * 100, 2)
+            "prediction": CLASS_NAMES[index],
+            "confidence": round(float(output_data[0][index]) * 100, 2)
         }
     except Exception as e:
         return {"status": "error", "message": str(e)}
-
-if __name__ == "__main__":
-    import uvicorn
-    uvicorn.run(app, host="127.0.0.1", port=8000)
