@@ -2,4 +2,9 @@ fastapi
 uvicorn
 tflite-runtime
 pillow
+python-multipartfastapi
+uvicorn
+tflite-runtime
+pillow
 python-multipart
+numpy<2.0.0
