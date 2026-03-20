@@ -45,9 +45,8 @@
         .glow-effect { position: absolute; width: 400px; height: 400px; background: radial-gradient(circle, rgba(59, 130, 246, 0.08) 0%, transparent 70%); border-radius: 50%; filter: blur(40px); z-index: -1; pointer-events: none; }
     </style>
 </head>
-<body class="bg-background text-on-surface font-body selection:bg-primary/30 selection:text-white">
+<body class="bg-background text-on-surface font-body">
 <div class="glow-effect top-[-100px] left-[-100px]"></div>
-<div class="glow-effect bottom-[10%] right-[-100px]"></div>
 
 <header class="fixed top-0 w-full z-50 bg-slate-950/40 backdrop-blur-xl border-b border-white/5">
     <div class="max-w-7xl mx-auto px-6 py-4 flex justify-between items-center">
@@ -55,12 +54,7 @@
             <span class="material-symbols-outlined text-primary text-2xl">cloudy</span>
             <h1 class="text-xl font-bold tracking-tighter text-white">SkyCast Vision</h1>
         </div>
-        <nav class="hidden md:flex items-center gap-8">
-            <a class="font-['Inter'] font-semibold tracking-tight text-lg text-primary border-b-2 border-primary pb-1" href="#">Dashboard</a>
-        </nav>
-        <div class="flex items-center gap-4">
-            <div class="w-10 h-10 rounded-full bg-primary/20 flex items-center justify-center text-primary font-bold border border-primary/30 shadow-[0_0_15px_rgba(59,130,246,0.2)]">SM</div>
-        </div>
+        <div class="w-10 h-10 rounded-full bg-primary/20 flex items-center justify-center text-primary font-bold border border-primary/30">SM</div>
     </div>
 </header>
 
@@ -70,32 +64,81 @@
             <h2 class="text-[3.5rem] font-extrabold leading-[1.1] tracking-tight text-white">
                 Atmospheric <br><span class="text-primary drop-shadow-[0_0_20px_rgba(59,130,246,0.3)]">Intelligence</span>.
             </h2>
-            <p class="text-slate-400 text-lg leading-relaxed max-w-md">
-                Leverage state-of-the-art neural networks to classify sky patterns and meteorological phenomena with surgical precision.
-            </p>
+            <p class="text-slate-400 text-lg leading-relaxed max-w-md">Neural networks for sky pattern classification.</p>
         </div>
 
         <div class="lg:col-span-7">
-            <div class="glass-card rounded-2xl overflow-hidden shadow-2xl">
-                <div class="flex px-8 pt-8 border-b border-white/5">
-                    <button class="pb-4 mr-8 text-sm font-semibold text-primary border-b-2 border-primary transition-all">Upload File</button>
-                </div>
-                <div class="p-8">
-                    <div class="group cursor-pointer" id="upload-zone" onclick="document.getElementById('hiddenFileInput').click()">
-                        <div class="relative w-full aspect-[16/9] bg-slate-950/50 rounded-xl border-2 border-dashed border-white/10 group-hover:border-primary/40 group-hover:bg-primary/5 transition-all duration-300 flex flex-col items-center justify-center gap-4">
-                            <div class="w-16 h-16 rounded-full bg-slate-900 flex items-center justify-center text-primary group-hover:scale-110 group-hover:shadow-[0_0_20px_rgba(59,130,246,0.2)] transition-all">
-                                <span class="material-symbols-outlined text-3xl">cloud_upload</span>
-                            </div>
-                            <div class="text-center">
-                                <p class="text-white font-semibold text-lg" id="status-label">Upload sky photo</p>
-                                <p class="text-slate-500 text-sm mt-1">Supports JPG, PNG</p>
-                            </div>
-                            <input type="file" id="hiddenFileInput" class="hidden" accept="image/*" onchange="runInference()">
-                        </div>
+            <div class="glass-card rounded-2xl p-8 shadow-2xl">
+                <div class="group cursor-pointer" id="upload-zone" onclick="document.getElementById('fileInput').click()">
+                    <div class="relative w-full aspect-[16/9] bg-slate-950/50 rounded-xl border-2 border-dashed border-white/10 flex flex-col items-center justify-center gap-4">
+                        <span class="material-symbols-outlined text-3xl text-primary">cloud_upload</span>
+                        <p class="text-white font-semibold text-lg" id="status-text">Upload sky photo</p>
+                        <input type="file" id="fileInput" class="hidden" accept="image/*" onchange="predictWeather()">
                     </div>
                 </div>
             </div>
         </div>
     </div>
 
-    <div
+    <div class="grid grid-cols-1 md:grid-cols-12 gap-6">
+        <div class="md:col-span-4">
+            <div class="glass-card rounded-2xl p-8 shadow-xl relative overflow-hidden h-full">
+                <h3 class="text-[0.6875rem] font-bold text-slate-500 tracking-widest uppercase mb-8">Classification Result</h3>
+                <div class="space-y-2">
+                    <div id="prediction-output" class="text-[3rem] font-bold text-white">---</div>
+                    <div class="flex justify-between items-end">
+                        <span id="confidence-output" class="text-3xl font-extralight text-primary">0%</span>
+                        <span class="text-sm font-medium text-slate-500 mb-1">Confidence</span>
+                    </div>
+                </div>
+                <div class="mt-8 h-1.5 w-full bg-slate-900 rounded-full overflow-hidden">
+                    <div id="progress-bar" class="h-full bg-gradient-to-r from-primary to-blue-400 w-0 transition-all duration-700 rounded-full"></div>
+                </div>
+            </div>
+        </div>
+
+        <div class="md:col-span-8">
+            <div class="glass-card rounded-2xl overflow-hidden aspect-video h-full">
+                <img id="preview-image" alt="Preview" class="w-full h-full object-cover opacity-80" src="">
+            </div>
+        </div>
+    </div>
+</main>
+
+<script>
+async function predictWeather() {
+    const input = document.getElementById('fileInput');
+    const display = document.getElementById('prediction-output');
+    const confidence = document.getElementById('confidence-output');
+    const bar = document.getElementById('progress-bar');
+    const preview = document.getElementById('preview-image');
+    const status = document.getElementById('status-text');
+
+    if (input.files.length === 0) return;
+
+    const file = input.files[0];
+    preview.src = URL.createObjectURL(file);
+    status.innerText = "Analyzing...";
+    display.innerText = "Processing...";
+
+    const formData = new FormData();
+    formData.append("file", file);
+
+    try {
+        const response = await fetch('/predict', { method: 'POST', body: formData });
+        const data = await response.json();
+
+        if (data.status === "success") {
+            display.innerText = data.prediction;
+            confidence.innerText = data.confidence + "%";
+            bar.style.width = data.confidence + "%";
+            status.innerText = "Analysis Complete";
+        }
+    } catch (e) {
+        alert("Server is starting up. Please wait 10 seconds.");
+        status.innerText = "Upload failed";
+    }
+}
+</script>
+</body>
+</html>
