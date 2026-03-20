@@ -1,65 +1,110 @@
-<!DOCTYPE html>
-<html>
-<head>
-    <title>Weather Classifier</title>
-    <style>
-        /* This is your original simple styling */
-        body { font-family: sans-serif; text-align: center; margin-top: 50px; }
-        #result { margin-top: 20px; font-weight: bold; }
-        .loading { color: blue; }
-    </style>
-</head>
-<body>
+<main class="pt-32 pb-24 px-6 max-w-7xl mx-auto">
+    <div class="grid grid-cols-1 lg:grid-cols-12 gap-12 mb-20 items-start">
+        <div class="lg:col-span-5 space-y-6">
+            <h2 class="text-[3.5rem] font-extrabold leading-[1.1] tracking-tight text-white">
+                Atmospheric <br><span class="text-primary drop-shadow-[0_0_20px_rgba(59,130,246,0.3)]">Intelligence</span>.
+            </h2>
+            <p class="text-slate-400 text-lg leading-relaxed max-w-md">
+                Leverage state-of-the-art neural networks to classify sky patterns and meteorological phenomena with surgical precision.
+            </p>
+        </div>
 
-    <h1>Weather Classifier</h1>
-    <p>Upload an image to predict the weather (Cloudy, Rainy, or Sunny).</p>
+        <div class="lg:col-span-7">
+            <div class="glass-card rounded-2xl overflow-hidden shadow-2xl">
+                <div class="flex px-8 pt-8 border-b border-white/5">
+                    <button class="pb-4 mr-8 text-sm font-semibold text-primary border-b-2 border-primary">Upload File</button>
+                </div>
+                <div class="p-8">
+                    <div class="group cursor-pointer" id="upload-zone" onclick="document.getElementById('fileInput').click()">
+                        <div class="relative w-full aspect-[16/9] bg-slate-950/50 rounded-xl border-2 border-dashed border-white/10 group-hover:border-primary/40 group-hover:bg-primary/5 transition-all duration-300 flex flex-col items-center justify-center gap-4">
+                            <div class="w-16 h-16 rounded-full bg-slate-900 flex items-center justify-center text-primary group-hover:scale-110 group-hover:shadow-[0_0_20px_rgba(59,130,246,0.2)] transition-all">
+                                <span class="material-symbols-outlined text-3xl">cloud_upload</span>
+                            </div>
+                            <div class="text-center">
+                                <p class="text-white font-semibold text-lg" id="upload-text">Upload sky photo</p>
+                                <p class="text-slate-500 text-sm mt-1">Click to select JPG or PNG</p>
+                            </div>
+                            <input type="file" id="fileInput" class="hidden" accept="image/*" onchange="predictWeather()">
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="grid grid-cols-1 md:grid-cols-12 gap-6">
+        <div class="md:col-span-4 flex flex-col gap-6">
+            <div class="glass-card rounded-2xl p-8 shadow-xl flex-1 relative overflow-hidden">
+                <div class="absolute top-0 right-0 w-32 h-32 bg-primary/5 rounded-full -mr-16 -mt-16 blur-3xl"></div>
+                <h3 class="text-[0.6875rem] font-bold text-slate-500 tracking-widest uppercase mb-8">Classification Result</h3>
+                <div class="space-y-2">
+                    <div id="prediction-text" class="text-[3rem] font-bold text-white flex items-center gap-3">
+                        ---
+                    </div>
+                    <div class="flex justify-between items-end">
+                        <span id="confidence-text" class="text-3xl font-extralight text-primary">0%</span>
+                        <span class="text-sm font-medium text-slate-500 mb-1">Confidence Score</span>
+                    </div>
+                </div>
+                <div class="mt-8 h-1.5 w-full bg-slate-900 rounded-full overflow-hidden">
+                    <div id="confidence-bar" class="h-full bg-gradient-to-r from-primary to-blue-400 w-0 transition-all duration-700 rounded-full shadow-[0_0_10px_rgba(59,130,246,0.5)]"></div>
+                </div>
+            </div>
+        </div>
+
+        <div class="md:col-span-8">
+            <div class="relative group rounded-2xl overflow-hidden shadow-2xl glass-card aspect-video h-full min-h-[400px]">
+                <img id="preview-img" alt="Preview" class="w-full h-full object-cover opacity-80 transition-all duration-700" src="https://images.unsplash.com/photo-1534088568595-a066f410bcda?auto=format&fit=crop&q=80&w=1000">
+                <div class="absolute inset-0 bg-gradient-to-t from-slate-950/80 via-transparent to-transparent"></div>
+            </div>
+        </div>
+    </div>
+</main>
+
+<script>
+async function predictWeather() {
+    const fileInput = document.getElementById('fileInput');
+    const predictionText = document.getElementById('prediction-text');
+    const confidenceText = document.getElementById('confidence-text');
+    const confidenceBar = document.getElementById('confidence-bar');
+    const previewImg = document.getElementById('preview-img');
+    const uploadText = document.getElementById('upload-text');
+
+    if (fileInput.files.length === 0) return;
+
+    const file = fileInput.files[0];
     
-    <input type="file" id="imageInput" accept="image/*">
-    <br><br>
-    <button id="uploadBtn" onclick="predictWeather()">Predict Weather</button>
-    
-    <div id="result"></div>
+    // Show Preview Immediately
+    previewImg.src = URL.createObjectURL(file);
+    uploadText.innerText = "Processing...";
+    predictionText.innerText = "Analyzing...";
 
-    <script>
-    async function predictWeather() {
-        const fileInput = document.getElementById('imageInput');
-        const resultDiv = document.getElementById('result');
-        const btn = document.getElementById('uploadBtn');
+    const formData = new FormData();
+    formData.append("file", file);
 
-        if (fileInput.files.length === 0) {
-            alert("Please select an image first!");
-            return;
+    try {
+        const response = await fetch('/predict', {
+            method: 'POST',
+            body: formData
+        });
+
+        const data = await response.json();
+
+        if (data.status === "success") {
+            // Update UI with Results
+            const icons = { 'Cloudy': '☁️', 'Rainy': '🌧️', 'Sunny': '☀️' };
+            predictionText.innerText = `${data.prediction} ${icons[data.prediction] || ''}`;
+            confidenceText.innerText = `${data.confidence}%`;
+            confidenceBar.style.width = `${data.confidence}%`;
+            uploadText.innerText = "Analysis Complete";
+        } else {
+            alert("Error: " + data.message);
+            predictionText.innerText = "Error";
         }
-
-        // Show loading state
-        resultDiv.innerHTML = "<span class='loading'>Analyzing... please wait...</span>";
-        btn.disabled = true;
-
-        const formData = new FormData();
-        formData.append("file", fileInput.files[0]);
-
-        try {
-            // THE FIX: Uses '/predict' so it works on Render and Laptop
-            const response = await fetch('/predict', {
-                method: 'POST',
-                body: formData
-            });
-
-            const data = await response.json();
-
-            if (data.status === "success") {
-                resultDiv.innerHTML = "Prediction: " + data.prediction + " (" + data.confidence + "%)";
-            } else {
-                resultDiv.innerText = "Error: " + data.message;
-            }
-        } catch (error) {
-            // Handle the Render 'Cold Start' delay
-            resultDiv.innerText = "Server is waking up... Try again in 10 seconds.";
-            console.error("Error:", error);
-        } finally {
-            btn.disabled = false;
-        }
+    } catch (error) {
+        console.error("Error:", error);
+        predictionText.innerText = "Offline";
+        alert("Server is still waking up. Please wait 10 seconds and try again.");
     }
-    </script>
-</body>
-</html>
+}
+</script>
