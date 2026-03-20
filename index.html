@@ -1,79 +1,65 @@
 <!DOCTYPE html>
-<html lang="en">
+<html>
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>SkyCast Vision - AI Weather</title>
+    <title>Weather Classifier</title>
     <style>
-        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; text-align: center; background: #f0f2f5; padding-top: 50px; }
-        .container { background: white; padding: 30px; border-radius: 15px; display: inline-block; box-shadow: 0 4px 15px rgba(0,0,0,0.1); }
-        h1 { color: #007bff; }
-        input { margin: 20px 0; }
-        button { background: #007bff; color: white; border: none; padding: 10px 20px; border-radius: 5px; cursor: pointer; font-size: 16px; }
-        button:hover { background: #0056b3; }
-        #result { margin-top: 20px; font-weight: bold; font-size: 1.2rem; color: #333; }
-        .loader { display: none; margin: 20px auto; border: 4px solid #f3f3f3; border-top: 4px solid #3498db; border-radius: 50%; width: 30px; height: 30px; animation: spin 2s linear infinite; }
-        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+        /* This is your original simple styling */
+        body { font-family: sans-serif; text-align: center; margin-top: 50px; }
+        #result { margin-top: 20px; font-weight: bold; }
+        .loading { color: blue; }
     </style>
 </head>
 <body>
 
-<div class="container">
-    <h1>SkyCast Vision 🌤️</h1>
-    <p>Upload a sky photo to predict the weather.</p>
+    <h1>Weather Classifier</h1>
+    <p>Upload an image to predict the weather (Cloudy, Rainy, or Sunny).</p>
     
     <input type="file" id="imageInput" accept="image/*">
-    <br>
-    <button id="uploadBtn" onclick="predictWeather()">Analyze Sky</button>
+    <br><br>
+    <button id="uploadBtn" onclick="predictWeather()">Predict Weather</button>
     
-    <div class="loader" id="loader"></div>
     <div id="result"></div>
-</div>
 
-<script>
-async function predictWeather() {
-    const fileInput = document.getElementById('imageInput');
-    const resultDiv = document.getElementById('result');
-    const loader = document.getElementById('loader');
-    const btn = document.getElementById('uploadBtn');
+    <script>
+    async function predictWeather() {
+        const fileInput = document.getElementById('imageInput');
+        const resultDiv = document.getElementById('result');
+        const btn = document.getElementById('uploadBtn');
 
-    if (fileInput.files.length === 0) {
-        alert("Please select a sky photo first!");
-        return;
-    }
-
-    // Show loading, hide result
-    resultDiv.innerText = "";
-    loader.style.display = "block";
-    btn.disabled = true;
-
-    const formData = new FormData();
-    formData.append("file", fileInput.files[0]);
-
-    try {
-        // This '/predict' works for both Local and Render automatically
-        const response = await fetch('/predict', {
-            method: 'POST',
-            body: formData
-        });
-
-        const data = await response.json();
-
-        if (data.status === "success") {
-            resultDiv.innerHTML = `Prediction: <span style="color:#007bff">${data.prediction}</span><br>
-                                   Confidence: ${data.confidence}%`;
-        } else {
-            resultDiv.innerText = "Error: " + data.message;
+        if (fileInput.files.length === 0) {
+            alert("Please select an image first!");
+            return;
         }
-    } catch (error) {
-        resultDiv.innerText = "Server is starting up... Please try again in 30 seconds.";
-        console.error("Error:", error);
-    } finally {
-        loader.style.display = "none";
-        btn.disabled = false;
-    }
-}
-</script>
 
+        // Show loading state
+        resultDiv.innerHTML = "<span class='loading'>Analyzing... please wait...</span>";
+        btn.disabled = true;
+
+        const formData = new FormData();
+        formData.append("file", fileInput.files[0]);
+
+        try {
+            // THE FIX: Uses '/predict' so it works on Render and Laptop
+            const response = await fetch('/predict', {
+                method: 'POST',
+                body: formData
+            });
+
+            const data = await response.json();
+
+            if (data.status === "success") {
+                resultDiv.innerHTML = "Prediction: " + data.prediction + " (" + data.confidence + "%)";
+            } else {
+                resultDiv.innerText = "Error: " + data.message;
+            }
+        } catch (error) {
+            // Handle the Render 'Cold Start' delay
+            resultDiv.innerText = "Server is waking up... Try again in 10 seconds.";
+            console.error("Error:", error);
+        } finally {
+            btn.disabled = false;
+        }
+    }
+    </script>
 </body>
 </html>
